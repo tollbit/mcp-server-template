@@ -62,6 +62,13 @@ mcp-server-template/
 └── README.md             # This file
 ```
 
+## Installation
+
+```bash
+npm install
+npm run build
+```
+
 ##  Quick Start
 
 ### Prerequisites

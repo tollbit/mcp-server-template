@@ -1,0 +1,11 @@
+{
+  "mcp-server-machinegen": {
+    "command": "node",
+    "args": ["/Users/tp/projects/mcp-servers/mcp-server-machinegen/build/index.js"],
+    "env": {
+      "API_BASE_URL": "https://contentfeedapi.machinegenerated.com",
+      "API_KEY": "YOUR_API_KEY_HERE",
+      "SECRET_KEY": "YOUR_SECRET_KEY_HERE"
+    }
+  }
+} 
