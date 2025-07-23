@@ -1,6 +1,6 @@
 # Tollbit MCP Server Template
 
-An open-source GitHub project template that allows developers to quickly spin up a lightweight version of the Tollbit MCP server locally. This project serves as a public-facing boilerplate for prototyping, local development, and demos.
+An open-source GitHub project template that allows developers to quickly spin up a lightweight version of the Tollbit MCP server locally for the [Open-Meteo Weather Forecast API](https://open-meteo.com/en/docs). This project serves as a public-facing boilerplate for prototyping, local development, and demos.
 
 ## About TollBit
 
@@ -76,7 +76,7 @@ npm run build
 - Docker and Docker Compose
 - TollBit account (for production deployment)
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -84,32 +84,7 @@ npm run build
 |----------|-------------|---------|
 | `MCP_PORT` | Server port | `8080` |
 
-### Configuration Files
 
-
-## 🐳 Docker
-
-### Building Images
-
-
-### Running with Docker
-
-
-## 🚀 Deployment
-
-### AWS ECR Deployment
-
-1. **Setup AWS credentials:**
-   ```bash
-   export AWS_ACCESS_KEY_ID=your_key
-   export AWS_SECRET_ACCESS_KEY=your_secret
-   export AWS_DEFAULT_REGION=us-east-1
-   ```
-
-2. **Deploy to ECR:**
-   ```bash
-   make deploy-ecr
-   ```
 
 ### TollBit Platform Integration
 

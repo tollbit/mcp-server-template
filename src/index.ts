@@ -1,5 +1,5 @@
 /**
- * Properly Flattened MCP server for  API
+ * Properly Flattened MCP server for Open-Meteo Weather API
  */
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -9,76 +9,52 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import axios from "axios";
-import dotenv from "dotenv";
+import { fetchWeatherApi } from 'openmeteo';
 
-// Load environment variables
-dotenv.config();
+const params = {
+	"latitude": 52.52,
+	"longitude": 13.41,
+	"hourly": "temperature_2m"
+};
+const url = "https://api.open-meteo.com/v1/forecast";
+const responses = await fetchWeatherApi(url, params);
 
-// Configuration
-const API_BASE_URL = process.env.API_BASE_URL || "https://contentfeedapi.machinegenerated.com";
-// Hardcode the feed ID to 58 for Netflix viewership data
-const FEED_ID = "58";
-const API_KEY = process.env.API_KEY;
-const SECRET_KEY = process.env.SECRET_KEY;
+// Process first location. Add a for-loop for multiple locations or weather models
+const response = responses[0];
 
-if (!API_KEY || !SECRET_KEY) {
-  console.error("API_KEY and SECRET_KEY must be provided in environment variables");
-  process.exit(1);
+// Attributes for timezone and location
+const utcOffsetSeconds = response.utcOffsetSeconds();
+const timezone = response.timezone();
+const timezoneAbbreviation = response.timezoneAbbreviation();
+const latitude = response.latitude();
+const longitude = response.longitude();
+
+const hourly = response.hourly()!;
+
+// Note: The order of weather variables in the URL query and the indices below need to match!
+const weatherData = {
+	hourly: {
+		time: [...Array((Number(hourly.timeEnd()) - Number(hourly.time())) / hourly.interval())].map(
+			(_, i) => new Date((Number(hourly.time()) + i * hourly.interval() + utcOffsetSeconds) * 1000)
+		),
+		temperature2m: hourly.variables(0)!.valuesArray()!,
+	},
+};
+
+// `weatherData` now contains a simple structure with arrays for datetime and weather data
+for (let i = 0; i < weatherData.hourly.time.length; i++) {
+	console.log(
+		weatherData.hourly.time[i].toISOString(),
+		weatherData.hourly.temperature2m[i]
+	);
 }
-
-// API Client
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'api-key': API_KEY,
-    'secret': SECRET_KEY
-  }
-});
-
-// Add request/response interceptors for debugging if needed
-apiClient.interceptors.request.use(request => {
-  console.error(JSON.stringify({
-    level: 'info',
-    message: 'API Request',
-    data: {
-      url: request.url,
-      method: request.method
-    }
-  }));
-  return request;
-});
-
-apiClient.interceptors.response.use(
-  response => {
-    console.error(JSON.stringify({
-      level: 'info',
-      message: 'API Response Status',
-      data: {
-        status: response.status
-      }
-    }));
-    return response;
-  },
-  error => {
-    console.error(JSON.stringify({
-      level: 'error',
-      message: 'API Error',
-      error: {
-        message: error.message,
-        status: error.response?.status
-      }
-    }));
-    return Promise.reject(error);
-  }
-);
 
 /**
  * Create an MCP server with capabilities for tools only
  */
 const server = new Server(
   {
-    name: "netflix-viewership-data-flattened",
+    name: "open-meteo-weather-data-flattened",
     version: "1.0.0",
   },
   {
@@ -89,7 +65,7 @@ const server = new Server(
 );
 
 /**
- * Handler that lists available tools - directly exposing the four Netflix report types
+ * Handler that lists available weather tools
  */
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   console.error(JSON.stringify({
@@ -100,127 +76,342 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: "discover_netflix_data_capabilities",
-        description: "Provides a comprehensive guide to the Netflix viewership data available through this API. This explains how to effectively analyze trending content, compare viewership metrics, and track popularity changes over time.",
+        name: "discover_weather_capabilities",
+        description: "Provides a comprehensive guide to the weather data available through the Open-Meteo API. Explains available weather parameters, forecasting options, and how to effectively analyze weather patterns.",
         inputSchema: {
           type: "object",
           properties: {}
         }
       },
       {
-        name: "get_trending_english_tv_shows",
-        description: "Retrieves Netflix's trending English-language TV shows with viewership data, rankings, and week-over-week changes.",
+        name: "get_current_weather",
+        description: "Get current weather conditions including temperature, humidity, wind, and precipitation for a specific location.",
         inputSchema: {
           type: "object",
           properties: {
-            page_num: {
-              type: "integer",
-              description: "Page number (0-based)",
-              default: 0
+            latitude: {
+              type: "number",
+              description: "Latitude coordinate",
+              default: 52.52
             },
-            page_size: {
-              type: "integer",
-              description: "Number of items per page",
-              default: 10
+            longitude: {
+              type: "number", 
+              description: "Longitude coordinate",
+              default: 13.41
             },
-            published_date_from: {
+            temperature_unit: {
               type: "string",
-              format: "date",
-              description: "Start date for content (YYYY-MM-DD)"
+              enum: ["celsius", "fahrenheit"],
+              description: "Temperature unit",
+              default: "celsius"
             },
-            published_date_to: {
+            wind_speed_unit: {
               type: "string",
-              format: "date",
-              description: "End date for content (YYYY-MM-DD)"
+              enum: ["kmh", "mph", "ms", "kn"],
+              description: "Wind speed unit",
+              default: "kmh"
+            },
+            precipitation_unit: {
+              type: "string",
+              enum: ["mm", "inch"],
+              description: "Precipitation unit",
+              default: "mm"
             }
-          }
+          },
+          required: ["latitude", "longitude"]
         }
       },
       {
-        name: "get_trending_non_english_tv_shows",
-        description: "Retrieves Netflix's trending non-English TV shows with viewership data, rankings, and week-over-week changes.",
+        name: "get_hourly_forecast",
+        description: "Get detailed hourly weather forecast including temperature, precipitation, wind, humidity, and more for up to 7 days.",
         inputSchema: {
           type: "object",
           properties: {
-            page_num: {
-              type: "integer",
-              description: "Page number (0-based)",
-              default: 0
+            latitude: {
+              type: "number",
+              description: "Latitude coordinate",
+              default: 52.52
             },
-            page_size: {
-              type: "integer",
-              description: "Number of items per page",
-              default: 10
+            longitude: {
+              type: "number",
+              description: "Longitude coordinate", 
+              default: 13.41
             },
-            published_date_from: {
+            hourly: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "temperature_2m", "relative_humidity_2m", "dew_point_2m",
+                  "apparent_temperature", "precipitation_probability", "precipitation",
+                  "rain", "showers", "snowfall", "weather_code",
+                  "pressure_msl", "surface_pressure", "cloud_cover",
+                  "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
+                  "visibility", "evapotranspiration", "et0_fao_evapotranspiration",
+                  "vapour_pressure_deficit", "wind_speed_10m", "wind_speed_100m",
+                  "wind_direction_10m", "wind_direction_100m", "wind_gusts_10m",
+                  "soil_temperature_0_to_7cm", "soil_temperature_7_to_28cm",
+                  "soil_temperature_28_to_100cm", "soil_temperature_100_to_255cm",
+                  "soil_moisture_0_to_7cm", "soil_moisture_7_to_28cm",
+                  "soil_moisture_28_to_100cm", "soil_moisture_100_to_255cm"
+                ]
+              },
+              description: "Weather variables to include in hourly forecast",
+              default: ["temperature_2m", "relative_humidity_2m", "precipitation", "wind_speed_10m"]
+            },
+            start_date: {
               type: "string",
               format: "date",
-              description: "Start date for content (YYYY-MM-DD)"
+              description: "Start date (YYYY-MM-DD), defaults to today"
             },
-            published_date_to: {
-              type: "string",
+            end_date: {
+              type: "string", 
               format: "date",
-              description: "End date for content (YYYY-MM-DD)"
+              description: "End date (YYYY-MM-DD), defaults to 7 days from start"
+            },
+            timezone: {
+              type: "string",
+              description: "Timezone (e.g., 'auto', 'Europe/Berlin', 'America/New_York')",
+              default: "auto"
             }
-          }
+          },
+          required: ["latitude", "longitude"]
         }
       },
       {
-        name: "get_trending_english_movies",
-        description: "Retrieves Netflix's trending English-language movies with viewership data, rankings, and week-over-week changes.",
+        name: "get_daily_forecast",
+        description: "Get daily weather forecast including temperature ranges, precipitation totals, and weather summaries.",
         inputSchema: {
           type: "object",
           properties: {
-            page_num: {
-              type: "integer",
-              description: "Page number (0-based)",
-              default: 0
+            latitude: {
+              type: "number",
+              description: "Latitude coordinate",
+              default: 52.52
             },
-            page_size: {
-              type: "integer",
-              description: "Number of items per page",
-              default: 10
+            longitude: {
+              type: "number",
+              description: "Longitude coordinate",
+              default: 13.41
             },
-            published_date_from: {
+            daily: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "temperature_2m_max", "temperature_2m_min", "apparent_temperature_max",
+                  "apparent_temperature_min", "precipitation_sum", "rain_sum",
+                  "showers_sum", "snowfall_sum", "precipitation_hours",
+                  "precipitation_probability_max", "weather_code",
+                  "sunrise", "sunset", "daylight_duration",
+                  "sunshine_duration", "uv_index_max", "uv_index_clear_sky_max",
+                  "wind_speed_10m_max", "wind_gusts_10m_max", "wind_direction_10m_dominant",
+                  "shortwave_radiation_sum", "et0_fao_evapotranspiration"
+                ]
+              },
+              description: "Weather variables to include in daily forecast",
+              default: ["temperature_2m_max", "temperature_2m_min", "precipitation_sum", "weather_code"]
+            },
+            start_date: {
+              type: "string",
+              format: "date", 
+              description: "Start date (YYYY-MM-DD), defaults to today"
+            },
+            end_date: {
               type: "string",
               format: "date",
-              description: "Start date for content (YYYY-MM-DD)"
+              description: "End date (YYYY-MM-DD), defaults to 7 days from start"
             },
-            published_date_to: {
+            timezone: {
               type: "string",
-              format: "date",
-              description: "End date for content (YYYY-MM-DD)"
+              description: "Timezone (e.g., 'auto', 'Europe/Berlin', 'America/New_York')",
+              default: "auto"
             }
-          }
+          },
+          required: ["latitude", "longitude"]
         }
       },
       {
-        name: "get_trending_non_english_movies",
-        description: "Retrieves Netflix's trending non-English movies with viewership data, rankings, and week-over-week changes.",
+        name: "get_marine_weather",
+        description: "Get marine weather forecast including wave height, wave direction, and sea temperature.",
         inputSchema: {
           type: "object",
           properties: {
-            page_num: {
-              type: "integer",
-              description: "Page number (0-based)",
-              default: 0
+            latitude: {
+              type: "number",
+              description: "Latitude coordinate",
+              default: 52.52
             },
-            page_size: {
+            longitude: {
+              type: "number",
+              description: "Longitude coordinate",
+              default: 13.41
+            },
+            hourly: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "wave_height", "wave_direction", "wave_period",
+                  "sea_temperature", "wind_wave_height", "wind_wave_direction",
+                  "wind_wave_period", "swell_wave_height", "swell_wave_direction",
+                  "swell_wave_period"
+                ]
+              },
+              description: "Marine weather variables",
+              default: ["wave_height", "wave_direction", "sea_temperature"]
+            },
+            start_date: {
+              type: "string",
+              format: "date",
+              description: "Start date (YYYY-MM-DD)"
+            },
+            end_date: {
+              type: "string", 
+              format: "date",
+              description: "End date (YYYY-MM-DD)"
+            }
+          },
+          required: ["latitude", "longitude"]
+        }
+      },
+      {
+        name: "get_air_quality",
+        description: "Get air quality data including PM2.5, PM10, ozone, and other pollutants.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            latitude: {
+              type: "number",
+              description: "Latitude coordinate",
+              default: 52.52
+            },
+            longitude: {
+              type: "number",
+              description: "Longitude coordinate",
+              default: 13.41
+            },
+            hourly: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "pm10", "pm2_5", "carbon_monoxide", "nitrogen_dioxide",
+                  "sulphur_dioxide", "ozone", "aerosol_optical_depth",
+                  "dust", "uv_index", "uv_index_clear_sky",
+                  "ammonia", "alder_pollen", "birch_pollen", "grass_pollen",
+                  "mugwort_pollen", "olive_pollen", "ragweed_pollen"
+                ]
+              },
+              description: "Air quality variables",
+              default: ["pm10", "pm2_5", "ozone", "nitrogen_dioxide"]
+            },
+            start_date: {
+              type: "string",
+              format: "date",
+              description: "Start date (YYYY-MM-DD)"
+            },
+            end_date: {
+              type: "string",
+              format: "date",
+              description: "End date (YYYY-MM-DD)"
+            }
+          },
+          required: ["latitude", "longitude"]
+        }
+      },
+      {
+        name: "get_historical_weather",
+        description: "Get historical weather data for past dates (limited availability).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            latitude: {
+              type: "number",
+              description: "Latitude coordinate",
+              default: 52.52
+            },
+            longitude: {
+              type: "number",
+              description: "Longitude coordinate",
+              default: 13.41
+            },
+            start_date: {
+              type: "string",
+              format: "date",
+              description: "Start date (YYYY-MM-DD), must be in the past"
+            },
+            end_date: {
+              type: "string",
+              format: "date",
+              description: "End date (YYYY-MM-DD), must be in the past"
+            },
+            hourly: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "temperature_2m", "relative_humidity_2m", "dew_point_2m",
+                  "apparent_temperature", "precipitation", "rain", "snowfall",
+                  "weather_code", "pressure_msl", "surface_pressure",
+                  "cloud_cover", "wind_speed_10m", "wind_direction_10m"
+                ]
+              },
+              description: "Historical weather variables",
+              default: ["temperature_2m", "precipitation", "weather_code"]
+            }
+          },
+          required: ["latitude", "longitude", "start_date", "end_date"]
+        }
+      },
+      {
+        name: "get_weather_alerts",
+        description: "Get severe weather alerts and warnings for a specific location.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            latitude: {
+              type: "number",
+              description: "Latitude coordinate",
+              default: 52.52
+            },
+            longitude: {
+              type: "number",
+              description: "Longitude coordinate",
+              default: 13.41
+            }
+          },
+          required: ["latitude", "longitude"]
+        }
+      },
+      {
+        name: "get_geocoding",
+        description: "Convert location names to coordinates for weather queries.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "Location name (e.g., 'London', 'New York', 'Tokyo')"
+            },
+            count: {
               type: "integer",
-              description: "Number of items per page",
+              description: "Number of results to return",
               default: 10
             },
-            published_date_from: {
+            language: {
               type: "string",
-              format: "date",
-              description: "Start date for content (YYYY-MM-DD)"
+              description: "Language for results",
+              default: "en"
             },
-            published_date_to: {
+            format: {
               type: "string",
-              format: "date",
-              description: "End date for content (YYYY-MM-DD)"
+              enum: ["json", "xml"],
+              description: "Response format",
+              default: "json"
             }
-          }
+          },
+          required: ["name"]
         }
       }
     ]
@@ -228,235 +419,338 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 /**
- * Handler for tool calls with truly flattened approach for Netflix data
+ * Handler for weather tool calls
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     const toolName = request.params.name;
+    const args = request.params.arguments || {};
+    
     console.error(JSON.stringify({
       level: 'info',
-      message: `Executing tool: ${toolName}`,
-      data: request.params.arguments
+      message: `Executing weather tool: ${toolName}`,
+      data: args
     }));
-    
-    // Netflix data capabilities discovery
-    if (toolName === "discover_netflix_data_capabilities") {
-      // Create a comprehensive guide as a structured response
-      const netflixDataGuide = {
+
+    // Weather capabilities discovery
+    if (toolName === "discover_weather_capabilities") {
+      const weatherGuide = {
         status: "success",
-        title: "Netflix Viewership Data Capabilities Guide",
-        overview: "This API provides access to Netflix's official top 10 viewership data across different content categories and languages. You can analyze trending content, view counts, hours watched, and rank changes over time.",
-        availableReports: [
+        title: "Open-Meteo Weather API Capabilities Guide",
+        overview: "This API provides comprehensive weather data including current conditions, hourly/daily forecasts, marine weather, air quality, and historical data. All data is free and available globally.",
+        availableTools: [
           {
-            reportName: "get_trending_english_tv_shows",
-            description: "Top 10 English-language TV shows on Netflix by viewership"
+            toolName: "get_current_weather",
+            description: "Current weather conditions with temperature, humidity, wind, and precipitation"
           },
           {
-            reportName: "get_trending_non_english_tv_shows",
-            description: "Top 10 non-English TV shows on Netflix by viewership"
+            toolName: "get_hourly_forecast", 
+            description: "Detailed hourly forecasts for up to 7 days with multiple weather parameters"
           },
           {
-            reportName: "get_trending_english_movies",
-            description: "Top 10 English-language movies on Netflix by viewership"
+            toolName: "get_daily_forecast",
+            description: "Daily weather summaries with temperature ranges and precipitation totals"
           },
           {
-            reportName: "get_trending_non_english_movies",
-            description: "Top 10 non-English movies on Netflix by viewership"
+            toolName: "get_marine_weather",
+            description: "Marine weather including wave height, direction, and sea temperature"
+          },
+          {
+            toolName: "get_air_quality",
+            description: "Air quality data including PM2.5, PM10, ozone, and pollutants"
+          },
+          {
+            toolName: "get_historical_weather",
+            description: "Historical weather data for past dates (limited availability)"
+          },
+          {
+            toolName: "get_weather_alerts",
+            description: "Severe weather alerts and warnings"
+          },
+          {
+            toolName: "get_geocoding",
+            description: "Convert location names to coordinates"
           }
         ],
-        metrics: [
-          "Views count (millions)",
-          "Hours viewed (millions)",
-          "Rank position",
-          "Week-over-week changes",
-          "Percentage viewership changes"
-        ],
-        analysisScenarios: [
-          {
-            scenario: "Compare TV Shows vs. Movies popularity",
-            approach: "Request both TV shows and Movies reports and compare view counts"
-          },
-          {
-            scenario: "Analyze language preferences globally",
-            approach: "Compare English vs. Non-English content performance within the same content type"
-          },
-          {
-            scenario: "Track popularity trends over time",
-            approach: "Use date parameters to request data from different time periods"
-          },
-          {
-            scenario: "Identify sudden viewership surges",
-            approach: "Look for high percentage increases in week-over-week comparisons"
-          }
-        ],
-        responseStructure: {
-          description: "Each content item contains detailed viewership statistics and comparative data",
-          keyElements: [
-            "headline - The title and main viewership insight",
-            "body - Detailed analysis with sections for current period, previous period, and rank changes",
-            "view counts - Number of unique views in millions",
-            "hours viewed - Total watch time in millions of hours",
-            "rank changes - Position movements with percentage viewership changes",
-            "chart_media - Visual content thumbnails"
-          ]
+        weatherParameters: {
+          temperature: ["temperature_2m", "apparent_temperature", "dew_point_2m"],
+          precipitation: ["precipitation", "rain", "showers", "snowfall", "precipitation_probability"],
+          wind: ["wind_speed_10m", "wind_direction_10m", "wind_gusts_10m"],
+          humidity: ["relative_humidity_2m", "vapour_pressure_deficit"],
+          pressure: ["pressure_msl", "surface_pressure"],
+          clouds: ["cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high"],
+          visibility: ["visibility", "weather_code"],
+          soil: ["soil_temperature_0_to_7cm", "soil_moisture_0_to_7cm"],
+          marine: ["wave_height", "wave_direction", "sea_temperature"],
+          airQuality: ["pm10", "pm2_5", "ozone", "nitrogen_dioxide"]
+        },
+        units: {
+          temperature: ["celsius", "fahrenheit"],
+          windSpeed: ["kmh", "mph", "ms", "kn"],
+          precipitation: ["mm", "inch"]
+        },
+        coverage: {
+          global: "Worldwide coverage",
+          resolution: "11km for most parameters",
+          updateFrequency: "Real-time updates",
+          forecastRange: "Up to 7 days",
+          historicalData: "Limited availability for past dates"
         }
       };
 
       return {
         content: [{
           type: "text",
-          text: JSON.stringify(netflixDataGuide, null, 2)
+          text: JSON.stringify(weatherGuide, null, 2)
         }]
       };
     }
-    
-    // Retrieve English TV Shows
-    if (toolName === "get_trending_english_tv_shows") {
-      const { 
-        page_num = 0,
-        page_size = 10,
-        published_date_from,
-        published_date_to
-      } = request.params.arguments || {};
+
+    // Get current weather
+    if (toolName === "get_current_weather") {
+      const { latitude, longitude, temperature_unit = "celsius", wind_speed_unit = "kmh", precipitation_unit = "mm" } = args;
       
-      const response = await apiClient.post('/api/content/feed', {
-        feed_id: parseInt(FEED_ID),
-        page_num,
-        page_size,
-        format: "json",
-        entity_details: [
-          { entity_type: "Visual Media", entity_value: "TV Show" },
-          { entity_type: "Language", entity_value: "English" }
-        ],
-        published_date_from,
-        published_date_to
-      });
+      const params = {
+        latitude,
+        longitude,
+        current: ["temperature_2m", "relative_humidity_2m", "apparent_temperature", "precipitation", "rain", "weather_code", "pressure_msl", "surface_pressure", "wind_speed_10m", "wind_direction_10m"],
+        temperature_unit,
+        wind_speed_unit,
+        precipitation_unit
+      };
+
+      const url = "https://api.open-meteo.com/v1/forecast";
+      const response = await axios.get(url, { params });
       
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
             status: "success",
-            report_type: "trending_english_tv_shows",
-            contents: response.data.contents,
-            pagination: response.data.pagination
+            tool: "get_current_weather",
+            location: { latitude, longitude },
+            current_weather: response.data.current,
+            units: { temperature_unit, wind_speed_unit, precipitation_unit }
           }, null, 2)
         }]
       };
     }
-    
-    // Retrieve Non-English TV Shows
-    if (toolName === "get_trending_non_english_tv_shows") {
-      const { 
-        page_num = 0,
-        page_size = 10,
-        published_date_from,
-        published_date_to
-      } = request.params.arguments || {};
+
+    // Get hourly forecast
+    if (toolName === "get_hourly_forecast") {
+      const { latitude, longitude, hourly = ["temperature_2m", "relative_humidity_2m", "precipitation", "wind_speed_10m"], start_date, end_date, timezone = "auto" } = args;
       
-      const response = await apiClient.post('/api/content/feed', {
-        feed_id: parseInt(FEED_ID),
-        page_num,
-        page_size,
-        format: "json",
-        entity_details: [
-          { entity_type: "Visual Media", entity_value: "TV Show" },
-          { entity_type: "Language", entity_value: "Non English" }
-        ],
-        published_date_from,
-        published_date_to
-      });
+      const params: any = {
+        latitude,
+        longitude,
+        hourly,
+        timezone
+      };
+      
+      if (start_date) params.start_date = start_date;
+      if (end_date) params.end_date = end_date;
+
+      const url = "https://api.open-meteo.com/v1/forecast";
+      const response = await axios.get(url, { params });
       
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
             status: "success",
-            report_type: "trending_non_english_tv_shows",
-            contents: response.data.contents,
-            pagination: response.data.pagination
+            tool: "get_hourly_forecast",
+            location: { latitude, longitude },
+            hourly_data: response.data.hourly,
+            timezone: response.data.timezone,
+            timezone_abbreviation: response.data.timezone_abbreviation,
+            utc_offset_seconds: response.data.utc_offset_seconds
           }, null, 2)
         }]
       };
     }
-    
-    // Retrieve English Movies
-    if (toolName === "get_trending_english_movies") {
-      const { 
-        page_num = 0,
-        page_size = 10,
-        published_date_from,
-        published_date_to
-      } = request.params.arguments || {};
+
+    // Get daily forecast
+    if (toolName === "get_daily_forecast") {
+      const { latitude, longitude, daily = ["temperature_2m_max", "temperature_2m_min", "precipitation_sum", "weather_code"], start_date, end_date, timezone = "auto" } = args;
       
-      const response = await apiClient.post('/api/content/feed', {
-        feed_id: parseInt(FEED_ID),
-        page_num,
-        page_size,
-        format: "json",
-        entity_details: [
-          { entity_type: "Visual Media", entity_value: "Movie" },
-          { entity_type: "Language", entity_value: "English" }
-        ],
-        published_date_from,
-        published_date_to
-      });
+      const params: any = {
+        latitude,
+        longitude,
+        daily,
+        timezone
+      };
+      
+      if (start_date) params.start_date = start_date;
+      if (end_date) params.end_date = end_date;
+
+      const url = "https://api.open-meteo.com/v1/forecast";
+      const response = await axios.get(url, { params });
       
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
             status: "success",
-            report_type: "trending_english_movies",
-            contents: response.data.contents,
-            pagination: response.data.pagination
+            tool: "get_daily_forecast",
+            location: { latitude, longitude },
+            daily_data: response.data.daily,
+            timezone: response.data.timezone,
+            timezone_abbreviation: response.data.timezone_abbreviation,
+            utc_offset_seconds: response.data.utc_offset_seconds
           }, null, 2)
         }]
       };
     }
-    
-    // Retrieve Non-English Movies
-    if (toolName === "get_trending_non_english_movies") {
-      const { 
-        page_num = 0,
-        page_size = 10,
-        published_date_from,
-        published_date_to
-      } = request.params.arguments || {};
+
+    // Get marine weather
+    if (toolName === "get_marine_weather") {
+      const { latitude, longitude, hourly = ["wave_height", "wave_direction", "sea_temperature"], start_date, end_date } = args;
       
-      const response = await apiClient.post('/api/content/feed', {
-        feed_id: parseInt(FEED_ID),
-        page_num,
-        page_size,
-        format: "json",
-        entity_details: [
-          { entity_type: "Visual Media", entity_value: "Movie" },
-          { entity_type: "Language", entity_value: "Non English" }
-        ],
-        published_date_from,
-        published_date_to
-      });
+      const params: any = {
+        latitude,
+        longitude,
+        hourly,
+        models: "gfs_seamless"
+      };
+      
+      if (start_date) params.start_date = start_date;
+      if (end_date) params.end_date = end_date;
+
+      const url = "https://marine-api.open-meteo.com/v1/marine";
+      const response = await axios.get(url, { params });
       
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
             status: "success",
-            report_type: "trending_non_english_movies",
-            contents: response.data.contents,
-            pagination: response.data.pagination
+            tool: "get_marine_weather",
+            location: { latitude, longitude },
+            marine_data: response.data.hourly,
+            timezone: response.data.timezone
           }, null, 2)
         }]
       };
     }
-    
+
+    // Get air quality
+    if (toolName === "get_air_quality") {
+      const { latitude, longitude, hourly = ["pm10", "pm2_5", "ozone", "nitrogen_dioxide"], start_date, end_date } = args;
+      
+      const params: any = {
+        latitude,
+        longitude,
+        hourly
+      };
+      
+      if (start_date) params.start_date = start_date;
+      if (end_date) params.end_date = end_date;
+
+      const url = "https://air-quality-api.open-meteo.com/v1/air-quality";
+      const response = await axios.get(url, { params });
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "success",
+            tool: "get_air_quality",
+            location: { latitude, longitude },
+            air_quality_data: response.data.hourly,
+            timezone: response.data.timezone
+          }, null, 2)
+        }]
+      };
+    }
+
+    // Get historical weather
+    if (toolName === "get_historical_weather") {
+      const { latitude, longitude, start_date, end_date, hourly = ["temperature_2m", "precipitation", "weather_code"] } = args;
+      
+      const params = {
+        latitude,
+        longitude,
+        hourly,
+        start_date,
+        end_date
+      };
+
+      const url = "https://archive-api.open-meteo.com/v1/archive";
+      const response = await axios.get(url, { params });
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "success",
+            tool: "get_historical_weather",
+            location: { latitude, longitude },
+            historical_data: response.data.hourly,
+            timezone: response.data.timezone
+          }, null, 2)
+        }]
+      };
+    }
+
+    // Get weather alerts
+    if (toolName === "get_weather_alerts") {
+      const { latitude, longitude } = args;
+      
+      const params = {
+        latitude,
+        longitude
+      };
+
+      const url = "https://api.open-meteo.com/v1/forecast";
+      const response = await axios.get(url, { params });
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "success",
+            tool: "get_weather_alerts",
+            location: { latitude, longitude },
+            alerts: response.data.alerts || null
+          }, null, 2)
+        }]
+      };
+    }
+
+    // Get geocoding
+    if (toolName === "get_geocoding") {
+      const { name, count = 10, language = "en", format = "json" } = args;
+      
+      const params = {
+        name,
+        count,
+        language,
+        format
+      };
+
+      const url = "https://geocoding-api.open-meteo.com/v1/search";
+      const response = await axios.get(url, { params });
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "success",
+            tool: "get_geocoding",
+            search_term: name,
+            results: response.data.results || []
+          }, null, 2)
+        }]
+      };
+    }
+
     // Unknown tool
-    throw new Error(`Unknown tool: ${toolName}`);
+    throw new Error(`Unknown weather tool: ${toolName}`);
     
   } catch (error: unknown) {
     console.error(JSON.stringify({
       level: 'error',
-      message: `Error executing tool ${request.params.name}`,
+      message: `Error executing weather tool ${request.params.name}`,
       error: error instanceof Error ? error.message : String(error)
     }));
     
@@ -479,7 +773,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   console.error(JSON.stringify({
     level: 'info',
-    message: 'Starting Netflix Viewership MCP server with flattened tools'
+    message: 'Starting Open-Meteo Weather MCP server with comprehensive weather tools'
   }));
   const transport = new StdioServerTransport();
   await server.connect(transport);
