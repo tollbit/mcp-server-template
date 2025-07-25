@@ -8,7 +8,7 @@ An open-source GitHub project template that allows developers to quickly spin up
 
 ### Introducing TollBit Tokens
 
-[TollBit Tokens](https://tollbit.dev/new) give agents access to MCP servers, websites, A2A and more - without the need for separate API keys. One TollBit account gives your agent reliable access to a portfolio of 1400+ sites, APIs, agents and MCP servers to create powerful experiences.
+[TollBit Tokens](https://docs.tollbit.dev/experimental/tollbit-tokens) give agents access to MCP servers, websites, A2A and more - without the need for separate API keys. One TollBit account gives your agent reliable access to a portfolio of 1400+ sites, APIs, agents and MCP servers to create powerful experiences.
 
 ### Key Features of TollBit Tokens
 
@@ -178,29 +178,6 @@ To integrate with the TollBit platform for AI agent data access:
 3. **Set Up Licensing**: Configure data licensing for AI agent consumption
 4. **Enable Analytics**: Monitor AI agent usage patterns and weather data access
 5. **Deploy to Marketplace**: Make your weather data available to AI agents
-
-## Development
-
-### Scripts
-
-- `npm run build` - Build the TypeScript project
-- `npm start` - Start the MCP server
-- `npm run dev` - Build and start in development mode
-- `npm run test` - Run the MCP inspector for testing
-- `npm run watch` - Watch mode for development
-- `npm run clean` - Clean build artifacts
-
-### Adding New Weather Tools
-
-To add new weather tools, modify the `src/index.ts` file:
-
-1. Add tool definition to the `ListToolsRequestSchema` handler
-2. Add tool implementation to the `CallToolRequestSchema` handler
-3. Use the Open-Meteo API endpoints as needed
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
