@@ -1,6 +1,6 @@
-# Tollbit MCP Server Template
+# Open-Meteo Weather MCP Server Template
 
-An open-source GitHub project template that allows developers to quickly spin up a lightweight version of the Tollbit MCP server locally for the [Open-Meteo Weather Forecast API](https://open-meteo.com/en/docs). This project serves as a public-facing boilerplate for prototyping, local development, and demos.
+An open-source GitHub project template that allows developers to quickly spin up a lightweight MCP server for the [Open-Meteo Weather Forecast API](https://open-meteo.com/en/docs). This project serves as a public-facing boilerplate for prototyping, local development, and demos with comprehensive weather data tools.
 
 ## About TollBit
 
@@ -19,13 +19,14 @@ An open-source GitHub project template that allows developers to quickly spin up
 
 ## Features
 
+- **Comprehensive Weather Tools**: 9 different weather data tools covering current conditions, forecasts, marine weather, air quality, and more
+- **Open-Meteo API Integration**: Direct integration with the free Open-Meteo weather API
 - **Lightweight MCP Server**: Core Model Context Protocol server implementation
-- **Optional Sidecar Container**: For logging, proxying, and monitoring
-- **Docker Compose Setup**: Complete local development environment
-- **GitHub Actions CI/CD**: Automated building, testing, and deployment
-- **AWS ECR Integration**: Optional deployment to Amazon ECR
-- **Multi-platform Support**: Builds for Linux, macOS, and Windows
-- **Comprehensive Documentation**: Clear setup and usage instructions
+- **Docker Support**: Containerized deployment with Docker
+- **TypeScript Implementation**: Full TypeScript support with proper type definitions
+- **Global Weather Coverage**: Worldwide weather data access
+- **Multiple Weather Parameters**: Temperature, precipitation, wind, humidity, pressure, clouds, visibility, soil, marine, and air quality
+- **Real-time Updates**: Live weather information and forecasts
 - **AI Agent Ready**: Optimized for integration with AI agents and RAG systems
 - **TollBit Token Integration**: Ready for token-based access control
 
@@ -33,9 +34,9 @@ An open-source GitHub project template that allows developers to quickly spin up
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   AI Agents     │    │   MCP Server    │    │   Sidecar       │
-│   (Claude, etc) │◄──►│   (Main App)    │◄──►│   (Logging,     │
-│                 │    │                 │    │    Proxy, etc)  │
+│   AI Agents     │    │   MCP Server    │    │   Open-Meteo    │
+│   (Claude, etc) │◄──►│   (Weather      │◄──►│   Weather API   │
+│                 │    │    Tools)       │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
                               ▼
@@ -50,16 +51,28 @@ An open-source GitHub project template that allows developers to quickly spin up
 
 ### Components
 
-- **MCP Server**: Core server implementing the Model Context Protocol
-- **Sidecar Container**: Optional companion for logging, monitoring, or proxying
-- **Docker Compose**: Orchestration for local development and testing
+- **MCP Server**: Core server implementing the Model Context Protocol with weather tools
+- **Weather Tools**: 9 comprehensive tools for different weather data types
+- **Open-Meteo API**: Free weather data API with global coverage
+- **Docker Container**: Containerized deployment for easy scaling
 - **TollBit Integration**: Token-based access control and payment processing
 
 ## Project Structure
 
 ```
 mcp-server-template/
-└── README.md             # This file
+├── README.md                    # Project documentation
+├── package.json                 # Node.js dependencies and scripts
+├── package-lock.json            # Locked dependency versions
+├── tsconfig.json               # TypeScript configuration
+├── Dockerfile                  # Docker container definition
+├── .gitignore                  # Git ignore patterns
+├── LICENSE                     # MIT license
+├── claude_desktop_config.json  # Claude Desktop MCP configuration
+├── build/                      # Compiled JavaScript output
+├── node_modules/               # Node.js dependencies
+└── src/
+    └── index.ts                # Main MCP server implementation
 ```
 
 ## Installation
@@ -69,29 +82,136 @@ npm install
 npm run build
 ```
 
-##  Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- TollBit account (for production deployment)
+- Node.js 18+ and npm
+- Docker (optional, for containerized deployment)
+
+### Local Development
+
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Build the Project**:
+   ```bash
+   npm run build
+   ```
+
+3. **Run the Server**:
+   ```bash
+   npm start
+   ```
+
+4. **Test with MCP Inspector**:
+   ```bash
+   npm run inspector
+   ```
+
+### Docker Deployment
+
+1. **Build the Container**:
+   ```bash
+   docker build -t mcp-weather-server .
+   ```
+
+2. **Run the Container**:
+   ```bash
+   docker run -p 8080:8080 mcp-weather-server
+   ```
+
+## Available Weather Tools
+
+The MCP server provides 9 comprehensive weather tools:
+
+### Core Weather Tools
+- **`get_current_weather`** - Current conditions (temperature, humidity, wind, precipitation)
+- **`get_hourly_forecast`** - Detailed hourly forecasts for up to 7 days
+- **`get_daily_forecast`** - Daily weather summaries with temperature ranges
+
+### Specialized Weather Tools
+- **`get_marine_weather`** - Marine forecasts (wave height, direction, sea temperature)
+- **`get_air_quality`** - Air quality data (PM2.5, PM10, ozone, pollutants)
+- **`get_historical_weather`** - Historical weather data for past dates
+- **`get_weather_alerts`** - Severe weather alerts and warnings
+
+### Utility Tools
+- **`get_geocoding`** - Convert location names to coordinates
+- **`discover_weather_capabilities`** - Comprehensive guide to all available weather data
 
 ## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `MCP_PORT` | Server port | `8080` |
+The server uses the Open-Meteo API which is free and doesn't require API keys. No environment variables are required for basic functionality.
 
+### Weather Parameters
 
+The server supports a wide range of weather parameters:
 
-### TollBit Platform Integration
+- **Temperature**: `temperature_2m`, `apparent_temperature`, `dew_point_2m`
+- **Precipitation**: `precipitation`, `rain`, `showers`, `snowfall`, `precipitation_probability`
+- **Wind**: `wind_speed_10m`, `wind_direction_10m`, `wind_gusts_10m`
+- **Humidity**: `relative_humidity_2m`, `vapour_pressure_deficit`
+- **Pressure**: `pressure_msl`, `surface_pressure`
+- **Clouds**: `cloud_cover`, `cloud_cover_low`, `cloud_cover_mid`, `cloud_cover_high`
+- **Visibility**: `visibility`, `weather_code`
+- **Soil**: `soil_temperature_0_to_7cm`, `soil_moisture_0_to_7cm`
+- **Marine**: `wave_height`, `wave_direction`, `sea_temperature`
+- **Air Quality**: `pm10`, `pm2_5`, `ozone`, `nitrogen_dioxide`
+
+### Units
+
+- **Temperature**: `celsius`, `fahrenheit`
+- **Wind Speed**: `kmh`, `mph`, `ms`, `kn`
+- **Precipitation**: `mm`, `inch`
+
+## TollBit Platform Integration
 
 To integrate with the TollBit platform for AI agent data access:
 
 1. **Create TollBit Account**: Visit the [TollBit Developer Dashboard](https://docs.tollbit.com/developer-introduction) to set up your organization
-2. **Configure RAG Endpoints**: Set up your MCP server to serve RAG-optimized data
+2. **Configure Weather Endpoints**: Set up your MCP server to serve weather data with access control
 3. **Set Up Licensing**: Configure data licensing for AI agent consumption
-4. **Enable Analytics**: Monitor AI agent usage patterns and data access
-5. **Deploy to Marketplace**: Make your data available to AI agents 
+4. **Enable Analytics**: Monitor AI agent usage patterns and weather data access
+5. **Deploy to Marketplace**: Make your weather data available to AI agents
+
+## Development
+
+### Scripts
+
+- `npm run build` - Build the TypeScript project
+- `npm start` - Start the MCP server
+- `npm run dev` - Build and start in development mode
+- `npm run test` - Run the MCP inspector for testing
+- `npm run watch` - Watch mode for development
+- `npm run clean` - Clean build artifacts
+
+### Adding New Weather Tools
+
+To add new weather tools, modify the `src/index.ts` file:
+
+1. Add tool definition to the `ListToolsRequestSchema` handler
+2. Add tool implementation to the `CallToolRequestSchema` handler
+3. Use the Open-Meteo API endpoints as needed
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## Support
+
+- **Open-Meteo API**: [Documentation](https://open-meteo.com/en/docs)
+- **TollBit Platform**: [Developer Documentation](https://docs.tollbit.com/)
+- **MCP Protocol**: [Model Context Protocol](https://modelcontextprotocol.io/) 
