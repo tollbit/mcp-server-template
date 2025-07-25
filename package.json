@@ -21,9 +21,12 @@
     "@modelcontextprotocol/sdk": "0.6.0",
     "axios": "^1.9.0",
     "dotenv": "^16.5.0",
+    "jose": "^5.10.0",
+    "jsonwebtoken": "^9.0.2",
     "openmeteo": "^1.2.0"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.11.24",
     "typescript": "^5.3.3"
   }

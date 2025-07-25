@@ -12,7 +12,6 @@ An open-source GitHub project template that allows developers to quickly spin up
 
 ### Key Features of TollBit Tokens
 
-- **Auth & Security Made Simple**: Simply call the `/validate` endpoint without managing keys or cryptographic libraries
 - **Dynamic Authorization**: Tokens adapt to context in real-time with access rules based on reputation scores, usage patterns, or custom logic
 - **Unlock the Agent Economy**: Access premium articles, MCP servers, browser automation, and other agents seamlessly
 - **Payments Just Work**: Pay-as-you-go micropayments with automatic reconciliation and real-time balance updates
@@ -69,10 +68,13 @@ mcp-server-template/
 ├── .gitignore                  # Git ignore patterns
 ├── LICENSE                     # MIT license
 ├── claude_desktop_config.json  # Claude Desktop MCP configuration
+├── TOLBIT_INTEGRATION.md       # TollBit token integration guide
 ├── build/                      # Compiled JavaScript output
 ├── node_modules/               # Node.js dependencies
 └── src/
-    └── index.ts                # Main MCP server implementation
+    ├── index.ts                # Main MCP server implementation
+    ├── tollbit-auth.ts         # TollBit token verification utilities
+    └── config.ts               # Configuration management
 ```
 
 ## Installation
@@ -146,7 +148,14 @@ The MCP server provides 9 comprehensive weather tools:
 
 ### Environment Variables
 
-The server uses the Open-Meteo API which is free and doesn't require API keys. No environment variables are required for basic functionality.
+The server uses the Open-Meteo API which is free and doesn't require API keys. For TollBit token integration, you can set these optional environment variables:
+
+```bash
+# TollBit Token Configuration (Optional)
+TOLLBIT_SERVER_HOST=https://your-mcp-server.com  # Your server's host URL
+TOLLBIT_ENABLE_AUTH=true                         # Enable token authorization
+TOLLBIT_LOG_TOKENS=false                         # Enable token logging for debugging
+```
 
 ### Weather Parameters
 
@@ -191,4 +200,5 @@ To integrate with the TollBit platform for AI agent data access:
 
 - **Open-Meteo API**: [Documentation](https://open-meteo.com/en/docs)
 - **TollBit Platform**: [Developer Documentation](https://docs.tollbit.com/)
+- **TollBit Tokens**: [Token Integration Guide](TOLBIT_INTEGRATION.md)
 - **MCP Protocol**: [Model Context Protocol](https://modelcontextprotocol.io/) 

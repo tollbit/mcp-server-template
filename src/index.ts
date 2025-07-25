@@ -10,6 +10,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import axios from "axios";
 import { fetchWeatherApi } from 'openmeteo';
+import { TollBitAuth } from './tollbit-auth.js';
+import { getServerHost, isAuthEnabled, isTokenLoggingEnabled } from './config.js';
 
 const params = {
 	"latitude": 52.52,
@@ -423,6 +425,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
+    // TollBit Token Authorization (optional)
+    if (isAuthEnabled()) {
+      const serverHost = getServerHost();
+      const authResult = await TollBitAuth.validateToolCall(request.params, serverHost);
+      
+      if (!authResult.isValid) {
+        console.error(JSON.stringify({
+          level: 'error',
+          message: 'Authorization failed',
+          error: authResult.error
+        }));
+        
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              status: "error",
+              error: "Authorization failed",
+              message: authResult.error
+            }, null, 2)
+          }]
+        };
+      }
+
+      console.error(JSON.stringify({
+        level: 'info',
+        message: 'Authorization successful',
+        userId: authResult.userId,
+        transactionId: authResult.transactionId
+      }));
+
+      // Log token info if enabled
+      if (isTokenLoggingEnabled()) {
+        const token = TollBitAuth.extractTokenFromToolCall(request.params);
+        if (token) {
+          TollBitAuth.logTokenInfo(token);
+        }
+      }
+    }
+
     const toolName = request.params.name;
     const args = request.params.arguments || {};
     
